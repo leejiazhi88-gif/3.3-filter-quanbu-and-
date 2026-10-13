@@ -301,9 +301,23 @@ def apply():
         save('filter_before.json', filter_before)
         save('metadata_before.json', meta_before)
     expected_filter_range = f"{TARGET}!A1:Q{len([r for r in values[1:] if r and r[0]]) + 1}"
-    assert filter_before['data']['sheet_filter_info']['range'] == expected_filter_range, (
-        'Adjust filter range to include all qualified stocks before apply', expected_filter_range)
+    filter_info = feishu.sheet_filter(token, TARGET)['data']['sheet_filter_info']
+    assert not filter_info['filter_infos'] and not filter_info['filtered_out_rows'], (
+        'Active filters require review before reordering rows')
     assert (ROOT / 'work/personal_note_colors.json').exists(), 'Missing local note style map'
+    # Preserve edits to conditional formatting made after data preparation.
+    cf_before = current_cf
+    save('conditional_formats_before.json', cf_before)
+    if filter_info['range'] != expected_filter_range:
+        filter_path = f'sheets/v3/spreadsheets/{feishu.SPREADSHEET}/sheets/{TARGET}/filter'
+        feishu.api(filter_path, token, method='DELETE')
+        try:
+            feishu.api(filter_path, token, method='POST', body={'range': expected_filter_range, 'col': 'A',
+                         'condition': {'filter_type': 'clear'}})
+        except Exception:
+            feishu.api(filter_path, token, method='POST', body={'range': filter_info['range'], 'col': 'A',
+                         'condition': {'filter_type': 'clear'}})
+            raise
     if current == before:
         feishu.api(feishu.BASE + '/values', token, method='PUT', body=payload)
 
