@@ -169,7 +169,13 @@ def prepare():
     save('metadata_before.json', feishu.metadata(token, TARGET))
 
     pro = ts.pro_api()
-    realtime = ts.realtime_list(src='dc')
+    source = os.environ.get('QUOTE_SOURCE', 'dc')
+    assert source in ('dc', 'sina'), source
+    if source == 'sina':
+        from realtime_quotes import fetch_sina
+        realtime = fetch_sina()
+    else:
+        realtime = ts.realtime_list(src='dc')
     realtime.columns = [str(column).lower() for column in realtime.columns]
     realtime.to_csv(RAW / 'realtime_list.csv', index=False)
     assert len(realtime) > 5500 and realtime.ts_code.nunique() == len(realtime)
@@ -261,6 +267,7 @@ def prepare():
     assert len(values) == len(before)
     save('payload.json', {'valueRange': {'range': f'{TARGET}!A1:Q{len(before)}', 'values': values}})
     save('summary.json', {
+        'quote_source': source,
         'quote_time': stamp.strftime('%Y-%m-%d %H:%M:%S'),
         'title': f"实时数据（{stamp.strftime('%y.%m.%d %H')}点{stamp.strftime('%M')}分）",
         'existing': len(existing), 'added': len(additions), 'removed': 0,
