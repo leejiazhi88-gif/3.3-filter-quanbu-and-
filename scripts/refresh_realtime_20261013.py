@@ -180,6 +180,13 @@ def prepare():
     realtime.to_csv(RAW / 'realtime_list.csv', index=False)
     assert len(realtime) > 5500 and realtime.ts_code.nunique() == len(realtime)
     stamp = quote_timestamp(list(existing))
+    timestamp_check = stamp
+    quote_start = None
+    if source == 'sina':
+        quote_times = pd.to_datetime(stamp.strftime('%Y-%m-%d') + ' ' + realtime.quote_time)
+        assert quote_times.notna().all()
+        quote_start = quote_times.min().strftime('%Y-%m-%d %H:%M:%S')
+        stamp = quote_times.max()
     prior_daily = query(pro, 'daily', trade_date=PRIOR_CLOSE_DATE,
                         fields='ts_code,trade_date,close,pct_chg')
     prior_basic = query(pro, 'daily_basic', trade_date=PRIOR_CLOSE_DATE,
@@ -268,6 +275,8 @@ def prepare():
     save('payload.json', {'valueRange': {'range': f'{TARGET}!A1:Q{len(before)}', 'values': values}})
     save('summary.json', {
         'quote_source': source,
+        'timestamp_check_time': timestamp_check.strftime('%Y-%m-%d %H:%M:%S'),
+        'quote_time_start': quote_start,
         'quote_time': stamp.strftime('%Y-%m-%d %H:%M:%S'),
         'title': f"实时数据（{stamp.strftime('%y.%m.%d %H')}点{stamp.strftime('%M')}分）",
         'existing': len(existing), 'added': len(additions), 'removed': 0,
